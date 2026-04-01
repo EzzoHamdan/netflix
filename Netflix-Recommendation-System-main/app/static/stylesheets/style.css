@@ -1,0 +1,182 @@
+.landing-grid {
+	display: grid;
+	grid-template-columns: 1.05fr 0.95fr;
+	gap: clamp(1rem, 2vw, 2rem);
+	align-items: stretch;
+}
+
+.hero-panel,
+.form-panel {
+	border-radius: 28px;
+	border: 1px solid var(--line);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(4px);
+}
+
+.hero-panel {
+	background:
+		linear-gradient(150deg, rgba(255, 255, 255, 0.82), rgba(255, 250, 240, 0.78)),
+		url("../stylesheets/home-bg.jpg") center/cover;
+	padding: clamp(1.6rem, 3.5vw, 3rem);
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	min-height: 500px;
+}
+
+.hero-panel h1 {
+	margin: 0;
+	font-family: "Bebas Neue", Impact, sans-serif;
+	font-size: clamp(2.5rem, 6.2vw, 5.2rem);
+	line-height: 0.95;
+	letter-spacing: 0.03em;
+}
+
+.hero-panel p {
+	max-width: 52ch;
+	margin: 0.8rem 0 0;
+	color: var(--ink-soft);
+	font-size: clamp(1rem, 1.4vw, 1.12rem);
+	line-height: 1.55;
+}
+
+.hero-metrics {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.75rem;
+	margin: 1.4rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hero-metrics li {
+	padding: 0.9rem 0.8rem;
+	border-radius: 14px;
+	background: rgba(18, 38, 61, 0.07);
+	border: 1px solid rgba(18, 38, 61, 0.1);
+}
+
+.hero-metrics strong {
+	display: block;
+	font-size: 1.3rem;
+}
+
+.hero-metrics span {
+	color: var(--ink-soft);
+	font-size: 0.85rem;
+}
+
+.form-panel {
+	background: rgba(255, 255, 255, 0.82);
+	padding: clamp(1.2rem, 2.6vw, 2rem);
+}
+
+.form-panel h2 {
+	margin: 0 0 1rem;
+	font-family: "Bebas Neue", Impact, sans-serif;
+	letter-spacing: 0.05em;
+	font-size: clamp(2rem, 4.2vw, 3rem);
+	font-weight: 400;
+}
+
+.field-block {
+	margin-bottom: 1.1rem;
+}
+
+.field-block label {
+	display: block;
+	margin-bottom: 0.48rem;
+	font-weight: 700;
+}
+
+.field-hint,
+.selection-meter {
+	margin: 0.42rem 0 0;
+	color: var(--ink-soft);
+	font-size: 0.88rem;
+}
+
+.selection-meter span {
+	color: var(--accent-deep);
+	font-weight: 800;
+}
+
+.validation-note {
+	margin: 0.2rem 0 0.8rem;
+	min-height: 1.2rem;
+	color: var(--accent-deep);
+	font-weight: 700;
+	font-size: 0.88rem;
+}
+
+#preference-form .primary-btn {
+	width: 100%;
+	padding: 0.88rem 1.2rem;
+	font-size: 1rem;
+}
+
+/* Skinning the multiselect plugin to match the new visual identity. */
+.ms-options-wrap > button,
+.ms-options-wrap > button:focus {
+	min-height: 52px;
+	border: 2px solid var(--line);
+	border-radius: 14px;
+	background: #fff;
+	color: var(--ink);
+	padding: 0.72rem 1rem;
+	font-size: 0.98rem;
+	outline: none;
+}
+
+.ms-options-wrap > button:after {
+	border-color: var(--accent) transparent transparent transparent;
+	right: 1rem;
+}
+
+.ms-options-wrap.ms-active > button,
+.ms-options-wrap > button:hover {
+	border-color: rgba(217, 74, 47, 0.68);
+}
+
+.ms-options-wrap > .ms-options {
+	margin-top: 0.5rem;
+	border-radius: 14px;
+	border: 2px solid var(--line);
+	box-shadow: 0 10px 24px rgba(18, 38, 61, 0.18);
+	overflow: hidden;
+}
+
+.ms-options-wrap > .ms-options .ms-search input {
+	border: 0;
+	border-bottom: 1px solid rgba(18, 38, 61, 0.12);
+	padding: 0.65rem 0.75rem;
+}
+
+.ms-options-wrap > .ms-options > ul input[type="checkbox"] {
+	margin-right: 0.6rem;
+}
+
+.ms-options-wrap > .ms-options > ul li.selected label,
+.ms-options-wrap > .ms-options > ul label:hover {
+	background: rgba(45, 122, 116, 0.12);
+}
+
+@media (max-width: 980px) {
+	.landing-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.hero-panel {
+		min-height: auto;
+	}
+}
+
+@media (max-width: 640px) {
+	.hero-metrics {
+		grid-template-columns: 1fr;
+	}
+
+	.hero-panel h1 {
+		font-size: clamp(2.2rem, 11vw, 3.4rem);
+	}
+}
