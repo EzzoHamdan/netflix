@@ -40,27 +40,38 @@
 
 			<section class="form-panel reveal" style="--stagger: 1;">
 				<h2>Build your profile</h2>
-				<form id="preference-form" name="passdata" action="{{ url_for('getvalue') }}" method="post" novalidate>
+				<p class="form-lead">Tell us what you already watch so the engine can shape a lineup with stronger signal and less noise.</p>
+				<form id="preference-form" name="passdata" action="{{ url_for('recommendations') }}" method="post" novalidate>
 					<div class="field-block">
-						<label for="titles">Titles you already enjoy</label>
+						<div class="field-meta">
+							<label for="titles">Titles you already enjoy</label>
+							<span class="field-chip field-chip-required">Required</span>
+						</div>
 						<select name="titles" multiple id="titles">
 							{% for title in titles %}
 							<option value="{{ title }}">{{ title }}</option>
 							{% endfor %}
 						</select>
-						<p class="field-hint">Pick at least 4 titles for better recommendation confidence.</p>
-						<p class="selection-meter"><span id="titles-count">0</span> of 4 minimum selected</p>
+						<div class="field-footer">
+							<p class="field-hint">Pick at least 4 titles for better recommendation confidence.</p>
+							<p class="selection-meter"><span id="titles-count">0</span> of 4 minimum selected</p>
+						</div>
 					</div>
 
 					<div class="field-block">
-						<label for="languages">Preferred languages</label>
+						<div class="field-meta">
+							<label for="languages">Preferred languages</label>
+							<span class="field-chip">Optional</span>
+						</div>
 						<select name="languages" multiple id="languages">
 							{% for language in languages %}
 							<option value="{{ language }}">{{ language }}</option>
 							{% endfor %}
 						</select>
-						<p class="field-hint">Optional: narrow recommendations to languages you actually watch.</p>
-						<p class="selection-meter"><span id="languages-count">0</span> selected</p>
+						<div class="field-footer">
+							<p class="field-hint">Optional: narrow recommendations to languages you actually watch.</p>
+							<p class="selection-meter"><span id="languages-count">0</span> selected</p>
+						</div>
 					</div>
 
 					<p id="validation-note" class="validation-note" aria-live="polite"></p>

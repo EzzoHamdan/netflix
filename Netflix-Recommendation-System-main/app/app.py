@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 
 from recommender import NetflixRecommender
 
@@ -16,8 +16,11 @@ def index():
     )
 
 
-@app.route('/about', methods=['POST'])
-def getvalue():
+@app.route('/recommendations', methods=['GET', 'POST'])
+def recommendations():
+    if request.method == 'GET':
+        return redirect(url_for('index'))
+
     movienames = request.form.getlist('titles')
     selected_languages = request.form.getlist('languages')
 
@@ -30,6 +33,13 @@ def getvalue():
     images = ranked_df['Image'].tolist() if not ranked_df.empty else []
     titles = ranked_df['Title'].tolist() if not ranked_df.empty else []
     return render_template('result.html', titles=titles, images=images)
+
+
+@app.route('/about', methods=['GET', 'POST'])
+def getvalue():
+    if request.method == 'GET':
+        return redirect(url_for('index'))
+    return recommendations()
 
 
 @app.route('/moviepage/<name>')
