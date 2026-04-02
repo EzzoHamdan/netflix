@@ -49,6 +49,9 @@ cd netflix-recommendation-system
 # Install flask (if you already haven't)
 pip install flask
 
+# Install project dependencies (recommended)
+pip install -r app/requirements.txt
+
 ```
 3) To run this application you don't need to have any special configuration but make sure you don't change the directory of the project otherwise you can recieve errors while you try to run the app.
 
@@ -67,7 +70,7 @@ The project now includes an offline quality harness and unit tests so you can it
 From the `app` folder:
 
 ```bash
-# activate virtual environment (example)
+# use one virtual environment only (project-local)
 source .venv/bin/activate
 
 # run offline evaluation profiles and quality metrics
@@ -78,6 +81,83 @@ python -m unittest tests/test_recommender.py -v
 ```
 
 The evaluation script reports profile-level alignment, depth, uniqueness, intellectual/action tone, and diversity.
+
+Important environment note:
+- Keep only `Netflix-Recommendation-System-main/app/.venv`.
+- If you have another `.venv` at repository root, remove it to avoid interpreter confusion.
+
+## ML Transition (Phase 0 + Phase 1)
+
+The project now includes a transition path from TF-IDF retrieval to semantic retrieval with sentence embeddings.
+
+### Phase 0: Data Hardening + Train-Ready Feature Store
+
+From the `app` folder:
+
+```bash
+# Build canonicalized, train-ready per-title features
+python ml_feature_pipeline.py \
+	--csv-path NetflixDataset.csv \
+	--output-path artifacts/title_feature_store.parquet \
+	--csv-fallback-path artifacts/title_feature_store.csv
+```
+
+This pipeline does the following:
+- Normalizes text and attempts to repair encoding artifacts.
+- Canonicalizes genres/tags/languages into stable tokens.
+- Parses runtime and date fields into numeric features.
+- Produces a reusable feature store for training and retrieval.
+
+### Phase 1: Semantic Retrieval + Baseline Validation
+
+Embedding model selected for this repo:
+- `sentence-transformers/all-MiniLM-L6-v2`
+
+Why this model:
+- Strong semantic quality for short media metadata.
+- Lightweight and practical for local development.
+- Fast inference for catalogs of this size.
+
+Run transition evaluation against TF-IDF baseline:
+
+```bash
+python evaluate_semantic_transition.py
+```
+
+This compares TF-IDF and semantic retrieval on the same profile metrics and prints precision deltas.
+
+### Phase 2: LambdaMART Re-Ranking
+
+Phase 2 adds:
+- Listwise training sample generation from semantic candidate pools.
+- LambdaMART training (`LightGBM LGBMRanker`) on handcrafted + embedding features.
+- MMR diversity rerank in final top-k after model scoring.
+- Offline profile-bucket evaluation against TF-IDF and semantic baselines.
+
+Train Phase 2 model:
+
+```bash
+python train_phase2_lambdamart.py \
+	--csv-path NetflixDataset.csv \
+	--feature-store-path artifacts/title_feature_store.parquet \
+	--model-artifact-path artifacts/lambdamart_ranker.joblib \
+	--training-data-path artifacts/lambdamart_training_samples.parquet \
+	--candidate-pool-limit 180 \
+	--max-queries 2000
+```
+
+Run 3-way offline evaluation by profile buckets:
+
+```bash
+python evaluate_phase2_transition.py
+```
+
+Use Phase 2 in the Flask app:
+
+```bash
+export RECOMMENDER_BACKEND=phase2
+flask run
+```
 
 ### Precision vs Diversity Knob
 
