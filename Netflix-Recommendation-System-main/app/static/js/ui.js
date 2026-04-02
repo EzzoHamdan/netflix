@@ -75,10 +75,10 @@
 
     form.addEventListener("submit", function (event) {
       var selectedTitleCount = countSelections(titlesSelect);
-      if (selectedTitleCount < 4) {
+      if (selectedTitleCount < 1) {
         event.preventDefault();
         if (note) {
-          note.textContent = "Please select at least 4 titles before continuing.";
+          note.textContent = "Please select at least 1 title before continuing.";
         }
         return;
       }
