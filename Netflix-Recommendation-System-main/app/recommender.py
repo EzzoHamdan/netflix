@@ -1,6 +1,7 @@
 import re
 from typing import Dict, Iterable, List, Set
 
+import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -21,6 +22,21 @@ def parse_tokens(value: object) -> List[str]:
     if not normalized:
         return []
     return [part.strip() for part in normalized.split(',') if part.strip()]
+
+
+def to_feature_token(value: object) -> str:
+    token = normalize_text(value)
+    token = re.sub(r'[^a-z0-9]+', '_', token)
+    return token.strip('_')
+
+
+def build_prefixed_tokens(tokens: Iterable[str], prefix: str) -> str:
+    prefixed: List[str] = []
+    for token in tokens:
+        normalized = to_feature_token(token)
+        if normalized:
+            prefixed.append(f'{prefix}_{normalized}')
+    return ' '.join(prefixed)
 
 
 def min_max_scale(series: pd.Series) -> pd.Series:
@@ -176,6 +192,15 @@ class NetflixRecommender:
 
         weighted_soup = []
         for _, row in self.model_data.iterrows():
+            genre_signature = build_prefixed_tokens(row['genre_tokens'], 'genre')
+            tag_signature = build_prefixed_tokens(row['tag_tokens'], 'tag')
+            language_signature = build_prefixed_tokens(sorted(row['language_set']), 'lang')
+            type_signature = ''
+            series_or_movie = row.get('Series or Movie', '')
+            type_token = to_feature_token(series_or_movie)
+            if type_token:
+                type_signature = f'type_{type_token}'
+
             chunks = [
                 " ".join([row['Genre']] * 3),
                 " ".join([row['Tags']] * 3),
@@ -183,12 +208,24 @@ class NetflixRecommender:
                 " ".join([row['Actors']] * 2),
                 " ".join([row['Director']] * 2),
                 " ".join([row['Writer']] * 2),
+                " ".join([row['Languages']] * 2),
                 row['ViewerRating'],
+                " ".join([genre_signature] * 2),
+                tag_signature,
+                language_signature,
+                type_signature,
             ]
             weighted_soup.append(" ".join(chunk for chunk in chunks if chunk).strip())
 
         self.model_data['soup'] = weighted_soup
-        self.vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2), min_df=2, max_df=0.90)
+        self.vectorizer = TfidfVectorizer(
+            stop_words='english',
+            ngram_range=(1, 2),
+            min_df=2,
+            max_df=0.90,
+            sublinear_tf=True,
+            strip_accents='unicode',
+        )
         self.tfidf_matrix = self.vectorizer.fit_transform(self.model_data['soup'])
         self.cosine_sim = cosine_similarity(self.tfidf_matrix, self.tfidf_matrix)
 
@@ -203,6 +240,33 @@ class NetflixRecommender:
         scores = list(enumerate(self.cosine_sim[idx]))
         scores.sort(key=lambda item: item[1], reverse=True)
         return [(candidate_idx, float(score)) for candidate_idx, score in scores[1:max_items + 1]]
+
+    def _resolve_seed_indices(self, seed_titles: List[str]) -> List[int]:
+        seen: Set[int] = set()
+        indices: List[int] = []
+
+        for title in seed_titles:
+            idx = self.title_index_map.get(normalize_title_key(title))
+            if idx is None or idx in seen:
+                continue
+            seen.add(int(idx))
+            indices.append(int(idx))
+
+        return indices
+
+    def _aggregate_seed_signals(self, seed_indices: List[int]) -> tuple[np.ndarray, np.ndarray]:
+        seed_sim_matrix = self.cosine_sim[seed_indices]
+        if seed_sim_matrix.ndim == 1:
+            seed_sim_matrix = seed_sim_matrix.reshape(1, -1)
+
+        sim_max = seed_sim_matrix.max(axis=0)
+        sim_avg = seed_sim_matrix.mean(axis=0)
+
+        # Encourage candidates that are relevant to multiple seeds, not only one outlier seed.
+        support_ratio = (seed_sim_matrix >= 0.10).mean(axis=0)
+        combined_similarity = 0.58 * sim_max + 0.30 * sim_avg + 0.12 * support_ratio
+
+        return combined_similarity.astype(float), support_ratio.astype(float)
 
     def _mmr_rerank(self, pool_df: pd.DataFrame, top_k: int, mmr_lambda: float) -> pd.DataFrame:
         if pool_df.empty:
@@ -253,26 +317,22 @@ class NetflixRecommender:
         mmr_lambda: float | None = None,
     ) -> pd.DataFrame:
         language_set: Set[str] = {normalize_text(lang) for lang in selected_languages if normalize_text(lang)}
+        seed_indices = self._resolve_seed_indices(seed_titles)
+        if not seed_indices:
+            return pd.DataFrame(columns=['Title', 'Image'])
+
         intent = self._infer_seed_intent(seed_titles)
         if mmr_lambda is None:
             mmr_lambda = intent['mmr_lambda']
 
         intellectual_mode = intent['intellectual_focus'] >= (intent['action_focus'] + 0.05)
 
-        similarity_buckets: Dict[int, List[float]] = {}
-        for seed_title in seed_titles:
-            for candidate_idx, similarity in self._get_similar_items(seed_title):
-                similarity_buckets.setdefault(candidate_idx, []).append(similarity)
-
-        if not similarity_buckets:
-            return pd.DataFrame(columns=['Title', 'Image'])
-
-        seed_keys = {normalize_title_key(title) for title in seed_titles}
+        similarity_scores, support_ratios = self._aggregate_seed_signals(seed_indices)
+        seed_idx_set = set(seed_indices)
         candidate_rows = []
 
-        for candidate_idx, similarities in similarity_buckets.items():
-            candidate = self.model_data.loc[candidate_idx]
-            if candidate['title_key'] in seed_keys:
+        for candidate_idx, candidate in self.model_data.iterrows():
+            if candidate_idx in seed_idx_set:
                 continue
 
             if language_set and not (candidate['language_set'] & language_set):
@@ -285,9 +345,8 @@ class NetflixRecommender:
             ):
                 continue
 
-            sim_max = max(similarities)
-            sim_avg = sum(similarities) / len(similarities)
-            combined_similarity = 0.62 * sim_max + 0.38 * sim_avg
+            combined_similarity = float(similarity_scores[candidate_idx])
+            seed_support_bonus = 0.04 * float(support_ratios[candidate_idx])
 
             mainstream_penalty = (
                 max(0.0, candidate['votes_norm'] - 0.78) * (1 - candidate['uniqueness_score'])
@@ -306,6 +365,7 @@ class NetflixRecommender:
                 + 0.13 * candidate['intellectual_tone_score']
                 + 0.09 * (1 - candidate['action_tone_score'])
                 + precision_bonus
+                + seed_support_bonus
                 - 0.16 * mainstream_penalty
             )
 
